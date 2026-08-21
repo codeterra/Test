@@ -9,7 +9,9 @@ function createApp(dataFile = path.join(__dirname, 'data', 'names.json')) {
 
   async function readNames() {
     try {
-      return JSON.parse(await fs.readFile(dataFile, 'utf8'));
+      return JSON.parse(await fs.readFile(dataFile, 'utf8')).map((entry) => (
+        typeof entry === 'string' ? { name: entry } : entry
+      ));
     } catch (error) {
       if (error.code === 'ENOENT') {
         await fs.mkdir(path.dirname(dataFile), { recursive: true });
@@ -34,16 +36,17 @@ function createApp(dataFile = path.join(__dirname, 'data', 'names.json')) {
 
   app.put('/name', async (request, response, next) => {
     try {
-      const { name } = request.body;
+      const { name, age } = request.body;
       const names = await readNames();
 
-      if (names.includes(name)) {
+      if (names.some((entry) => entry.name === name)) {
         return response.status(409).json({ error: 'Name already exists' });
       }
 
-      names.push(name);
+      const entry = age === undefined ? { name } : { name, age };
+      names.push(entry);
       await writeNames(names);
-      response.status(201).json({ name });
+      response.status(201).json(entry);
     } catch (error) {
       next(error);
     }
@@ -52,20 +55,24 @@ function createApp(dataFile = path.join(__dirname, 'data', 'names.json')) {
   app.patch('/name/:name', async (request, response, next) => {
     try {
       const names = await readNames();
-      const index = names.indexOf(request.params.name);
-      const { name } = request.body;
+      const index = names.findIndex((entry) => entry.name === request.params.name);
+      const { name, age } = request.body;
 
       if (index === -1) {
         return response.status(404).json({ error: 'Name not found' });
       }
 
-      if (names.includes(name)) {
+      if (name !== undefined && names.some((entry) => entry.name === name)) {
         return response.status(409).json({ error: 'Name already exists' });
       }
 
-      names[index] = name;
+      names[index] = {
+        ...names[index],
+        ...(name === undefined ? {} : { name }),
+        ...(age === undefined ? {} : { age })
+      };
       await writeNames(names);
-      response.json({ name });
+      response.json(names[index]);
     } catch (error) {
       next(error);
     }
