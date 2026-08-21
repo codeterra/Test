@@ -41,12 +41,13 @@ function request(server, method, pathname, body) {
   });
 }
 
-test('creates, lists, and persists names', async () => {
+test('creates, lists, and persists names with optional ages', async () => {
   await withApp(async (server, dataFile) => {
     assert.deepEqual(await request(server, 'GET', '/name'), { status: 200, body: { names: [] } });
-    assert.deepEqual(await request(server, 'PUT', '/name', { name: 'Ada' }), { status: 201, body: { name: 'Ada' } });
-    assert.deepEqual(await request(server, 'GET', '/name'), { status: 200, body: { names: ['Ada'] } });
-    assert.deepEqual(JSON.parse(await fs.readFile(dataFile, 'utf8')), ['Ada']);
+    assert.deepEqual(await request(server, 'PUT', '/name', { name: 'Ada', age: 12 }), { status: 201, body: { name: 'Ada', age: 12 } });
+    assert.deepEqual(await request(server, 'PUT', '/name', { name: 'Grace' }), { status: 201, body: { name: 'Grace' } });
+    assert.deepEqual(await request(server, 'GET', '/name'), { status: 200, body: { names: [{ name: 'Ada', age: 12 }, { name: 'Grace' }] } });
+    assert.deepEqual(JSON.parse(await fs.readFile(dataFile, 'utf8')), [{ name: 'Ada', age: 12 }, { name: 'Grace' }]);
   });
 });
 
@@ -58,11 +59,19 @@ test('rejects duplicate names', async () => {
   });
 });
 
-test('renames existing names and reports missing names', async () => {
+test('updates names and ages and reports missing names', async () => {
   await withApp(async (server) => {
-    await request(server, 'PUT', '/name', { name: 'Ada' });
-    assert.deepEqual(await request(server, 'PATCH', '/name/Ada', { name: 'Grace' }), { status: 200, body: { name: 'Grace' } });
+    await request(server, 'PUT', '/name', { name: 'Ada', age: 12 });
+    assert.deepEqual(await request(server, 'PATCH', '/name/Ada', { age: 13 }), { status: 200, body: { name: 'Ada', age: 13 } });
+    assert.deepEqual(await request(server, 'PATCH', '/name/Ada', { name: 'Grace', age: 14 }), { status: 200, body: { name: 'Grace', age: 14 } });
     assert.deepEqual(await request(server, 'PATCH', '/name/Ada', { name: 'Lin' }), { status: 404, body: { error: 'Name not found' } });
+  });
+});
+
+test('returns legacy string entries as name-only records', async () => {
+  await withApp(async (server, dataFile) => {
+    await fs.writeFile(dataFile, '["Ada"]\n');
+    assert.deepEqual(await request(server, 'GET', '/name'), { status: 200, body: { names: [{ name: 'Ada' }] } });
   });
 });
 
