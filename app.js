@@ -26,7 +26,7 @@ function createApp(dataFile = path.join(__dirname, 'data', 'names.json')) {
 
   app.get('/name', async (request, response, next) => {
     try {
-      response.json({ names: "Test Name" });
+      response.json({ names: await readNames() });
     } catch (error) {
       next(error);
     }
